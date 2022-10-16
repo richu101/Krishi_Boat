@@ -7,13 +7,14 @@ from sensor_msgs.msg import LaserScan
 range_max = 1
 # --------------------------
 
-kp = .1
-ki = 0
+kp = .8
+ki = 0.07
 kd = 0
 
 sumoferror = 0
 # --------------------------
 velocity = .5
+turningvelocity = .1
 
 regions = {
         'bright':   0,
@@ -27,11 +28,20 @@ def toint(reg):
     A = [int(val_list) for val_list in val_list]
     print("Int List : ", A)
     return(A)
-def PID(error):
+def PID(presentvalue):
     global sumoferror
-    sumoferror += error 
-    x = kp*error+ki*sumoferror
+    sumoferror += presentvalue 
+    x = (kp*presentvalue)+(ki*sumoferror)
     return x
+def laser_callback(msg):
+    global regions,range_max
+    regions = {
+        'bright':   min(min(msg.ranges[0:144]), range_max)   ,
+        'fright':   min(min(msg.ranges[144:288]), range_max) ,
+        'front':    min(min(msg.ranges[288:432]), range_max) ,
+        'fleft':    min(min(msg.ranges[432:576]), range_max) ,
+        'bleft':    min(min(msg.ranges[576:720]), range_max) ,
+    }
 
 def pos1error(reg):
     e = 5
@@ -45,8 +55,20 @@ def pos1error(reg):
     if(reg == [0,0,1,1,0]):e=1
     if(reg == [0,0,0,1,1]):e=3
     if(reg == [1,1,1,0,0]):e=-2.5
+    if(reg == [1,0,1,0,1]):e=-0.01
+    if(reg == [0,1,1,1,0]):e=-0.01
     if(reg == [0,0,1,1,1]):e=2.5
+    if(reg == [1,1,1,1,0]):e=-0.08
     return e
+def pos4pid(present):
+    global sumoferror
+    setpoint = .5
+    err = present - setpoint
+    sumoferror += err 
+    x = kp*(err)+ki*(sumoferror)
+    print("Pos 2 PID ",x)
+    return x
+
 def control_loop():
     rospy.init_node('ebot_controller')
 
@@ -60,11 +82,14 @@ def control_loop():
     velocity_msg.angular.z = 0
     pub.publish(velocity_msg)
     intlist = 0
+    distanceList = 0
     state = 0
     pos = 0
+    global sumoferror
     while not rospy.is_shutdown():
         
-        intlist = toint(regions)        
+        intlist = toint(regions)   
+        distanceList = list(regions.values())
         print("Bright :",regions['bright'])
         print("Fright :",regions['fright'])
         print("Forward :",regions['front'])
@@ -78,9 +103,20 @@ def control_loop():
         if(pos == 1):
             velocity_msg.linear.x = velocity        # At state 1 the rover starts moving forward 
         
-        elif(pos == 2):
-            velocity_msg.linear.x = 0        # At state 2 the rover stops at the ens and wait for the turning     
-        
+        elif(pos == 2 and intlist == [1,1,1,1,1]):
+            velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
+            sumoferror = 0
+            velocity_msg.angular.z = pos4pid(distanceList[4])
+
+        elif(pos == 2 and distanceList[2]>.4):
+            if(distanceList[4]>.4):
+                velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
+                sumoferror = 0
+                print("Pos 2 00000")
+                velocity_msg.angular.z = pos4pid(distanceList[3])
+                print("Pos 2 00000",velocity_msg.angular.z)
+            elif(distanceList[4]<.4):
+                velocity_msg.angular.z = -.3
         if(intlist != [1,1,1,1,1] and pos == 1):
             # This case the rover have to move forward till all the sensor value reach 1
             errorv = pos1error(intlist)
@@ -96,15 +132,7 @@ def control_loop():
         print("Controller message pushed at {}".format(rospy.get_time()))
         rate.sleep()
 
-def laser_callback(msg):
-    global regions,range_max
-    regions = {
-        'bright':   min(min(msg.ranges[0:144]), range_max)   ,
-        'fright':   min(min(msg.ranges[144:288]), range_max) ,
-        'front':    min(min(msg.ranges[288:432]), range_max) ,
-        'fleft':    min(min(msg.ranges[432:576]), range_max) ,
-        'bleft':    min(min(msg.ranges[576:720]), range_max) ,
-    }
+
 
 
 if __name__ == '__main__':
