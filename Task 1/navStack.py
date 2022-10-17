@@ -3,21 +3,21 @@
 import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
-
+import time
 range_max = 1
 # --------------------------
 
 kp = .8
-ki = .08
+ki = .03
 kd = 0
 
-kpbl = 2.8 
+kpbl = 2.9 
 kibl = .25
 
 sumoferror = 0
 sumoferrorbl = 0
 # --------------------------
-velocity = .9
+velocity = .95
 turningvelocity = .3
 
 regions = {
@@ -74,6 +74,24 @@ def pos1error(reg):
     if(reg == [0,0,1,1,1]):e=2.5 -1
     if(reg == [1,1,1,1,0]):e=-0.08
     return e
+
+def pos3error(reg):
+    e = 5
+    if(reg == [1,1,1,1,0]):e=-4 +1
+    if(reg == [0,1,0,0,0]):e=-2 +1
+    if(reg == [1,1,1,1,1]):e=0
+    if(reg == [0,0,0,1,0]):e=2 -1
+    if(reg == [0,0,0,0,1]):e=4 -1
+    if(reg == [1,1,0,0,0]):e=-3 +1
+    if(reg == [0,1,1,0,0]):e=-1 +.5
+    if(reg == [0,0,1,1,0]):e=1 -.5
+    if(reg == [0,0,0,1,1]):e=3 -1
+    if(reg == [1,1,1,0,0]):e=-2.5 +1
+    if(reg == [1,0,1,0,1]):e=-0.01
+    if(reg == [0,1,1,1,0]):e=-0.01
+    if(reg == [0,0,1,1,1]):e=2.5 -1
+    if(reg == [1,1,1,1,0]):e=-0.08
+    return e    
 def pos4pid(present,s):
     global sumoferror,kibl,kpbl
     setpoint = s
@@ -99,7 +117,7 @@ def control_loop():
     distanceList = 0
     state = 0
     pos = 0
-    global sumoferror
+    global sumoferror,sumoferrorbl
     while not rospy.is_shutdown():
         
         intlist = toint(regions)   
@@ -113,6 +131,9 @@ def control_loop():
         if(intlist == [1,1,1,1,1] and state == 0):  # Starting phase where all the sensor data = 1    
             pos += 1       # Keeping a pos value to know the position of the rover
             state = 1
+            sumoferror = 0
+            sumoferrorbl = 0
+
 
         if(pos == 1 ):
             velocity_msg.linear.x = velocity        # At state 1 the rover starts moving forward 
@@ -120,7 +141,7 @@ def control_loop():
         elif(pos == 2 and intlist == [1,1,1,1,1]):
             velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
             sumoferror = 0
-            velocity_msg.angular.z = pos4pid(distanceList[4],.5)
+            velocity_msg.angular.z = pos4pid(distanceList[3],.6)
 
         elif(pos == 2 and distanceList[2]>.5):
             if(distanceList[4]>.5):
@@ -150,8 +171,29 @@ def control_loop():
                 velocity_msg.linear.x =0
             state = 0
         if(pos ==3):
+            if(intlist == [1,1,1,1,1]):
+                velocity_msg.linear.x = velocity 
+                velocity_msg.angular.z = 0 
+                
+
+            else:
+                
+                if(distanceList[4]>.4):
+                    if(intlist == [0,0,1,0,0] ):
+                        velocity_msg.linear.x = velocity
+                        velocity_msg.angular.z = 0
+                        state=0
+                    else:
+                        velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
+                        sumoferror = 0
+                        velocity_msg.angular.z = pos4pid(distanceList[3],.6)
+                        print("Pos 2 00000",velocity_msg.angular.z)
+                elif(distanceList[4]<.4):
+                    velocity_msg.angular.z = -turningvelocity
+        if(pos == 4):
             velocity_msg.linear.x = 0
-            velocity_msg.angular.z = 0        
+            velocity_msg.angular.z = 0
+
         print("Pos : ",pos)
         pub.publish(velocity_msg)
         print("Controller message pushed at {}".format(rospy.get_time()))
@@ -165,6 +207,7 @@ if __name__ == '__main__':
         control_loop()
     except rospy.ROSInterruptException:
         pass 
+
 
 
 
