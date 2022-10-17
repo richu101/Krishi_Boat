@@ -17,7 +17,7 @@ kibl = .25
 sumoferror = 0
 sumoferrorbl = 0
 # --------------------------
-velocity = .95
+velocity = .96
 turningvelocity = .3
 
 regions = {
@@ -73,6 +73,7 @@ def pos1error(reg):
     if(reg == [0,1,1,1,0]):e=-0.01
     if(reg == [0,0,1,1,1]):e=2.5 -1
     if(reg == [1,1,1,1,0]):e=-0.08
+    if(reg == [0,1,1,1,1]):e=0.2
     return e
 
 def pos3error(reg):
@@ -170,6 +171,7 @@ def control_loop():
             else:
                 velocity_msg.linear.x =0
             state = 0
+            
         if(pos ==3):
             if(intlist == [1,1,1,1,1]):
                 velocity_msg.linear.x = velocity 
@@ -178,22 +180,34 @@ def control_loop():
 
             else:
                 
-                if(distanceList[4]>.4):
-                    if(intlist == [0,0,1,0,0] ):
+                if(distanceList[4]>.5):
+                    if(intlist == [0,0,1,0,0] or intlist == [1, 1, 1, 1, 0]):
                         velocity_msg.linear.x = velocity
                         velocity_msg.angular.z = 0
                         state=0
                     else:
                         velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
                         sumoferror = 0
-                        velocity_msg.angular.z = pos4pid(distanceList[3],.6)
+                        velocity_msg.angular.z = pos4pid(distanceList[3],.7)
                         print("Pos 2 00000",velocity_msg.angular.z)
-                elif(distanceList[4]<.4):
-                    velocity_msg.angular.z = -turningvelocity
+                elif(distanceList[4]<.6):
+                    velocity_msg.angular.z = pidbl(distanceList[4],kpbl,kibl,.5)
         if(pos == 4):
+            if(distanceList[4]>.5):
+                if(intlist == [0,0,1,0,0] or intlist == [1, 1, 1, 0, 0]):
+                    velocity_msg.linear.x = velocity
+                    velocity_msg.angular.z = 0
+                    state=0
+                else:
+                    velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
+                    sumoferror = 0
+                    velocity_msg.angular.z = pos4pid(distanceList[3],.7)
+                    print("Pos 2 00000",velocity_msg.angular.z)
+            elif(distanceList[4]<.6):
+                velocity_msg.angular.z = pidbl(distanceList[4],kpbl,kibl,.5)
+        if(pos == 5):
             velocity_msg.linear.x = 0
             velocity_msg.angular.z = 0
-
         print("Pos : ",pos)
         pub.publish(velocity_msg)
         print("Controller message pushed at {}".format(rospy.get_time()))
@@ -207,6 +221,9 @@ if __name__ == '__main__':
         control_loop()
     except rospy.ROSInterruptException:
         pass 
+
+
+
 
 
 
