@@ -3,41 +3,44 @@
 import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
-import time
+
 range_max = 1
 # --------------------------
 
-kp = .8
-ki = .03
+kp = 0.8
+ki = 0.03
 kd = 0
 
 kpbl = 2.9 
-kibl = .25
+kibl = 0.25
 
 sumoferror = 0
 sumoferrorbl = 0
 # --------------------------
 velocity = .96
 turningvelocity = .3
+stac =0
 
 regions = {
-        'bright':   0,
-        'fright':   0,
-        'front':    0,
+        'bright':  0,
+        'fright':  0,
+        'front':   0,
         'fleft':   0,
         'bleft':   0,
     }
-def toint(reg):
+def to_int(reg):
     val_list = list(reg.values())
     A = [int(val_list) for val_list in val_list]
     print("Int List : ", A)
-    return(A)
+    return A
+
 def PID(presentvalue):
     global sumoferror
     sumoferror += presentvalue 
-    x = (kp*presentvalue)+(ki*sumoferror)
+    x = (kp * presentvalue) + (ki * sumoferror)
     print("Pos 1 PID : ",x)
     return x
+
 def laser_callback(msg):
     global regions,range_max
     regions = {
@@ -59,39 +62,39 @@ def pidbl(present,kpbl,kibl,s):
 
 def pos1error(reg):
     e = 5
-    if(reg == [1,0,0,0,0]):e=-4 +1
-    if(reg == [0,1,0,0,0]):e=-2 +1
-    if(reg == [0,0,1,0,0]):e=0
-    if(reg == [0,0,0,1,0]):e=2 -1
-    if(reg == [0,0,0,0,1]):e=4 -1
-    if(reg == [1,1,0,0,0]):e=-3 +1
-    if(reg == [0,1,1,0,0]):e=-1 +.5
-    if(reg == [0,0,1,1,0]):e=1 -.5
-    if(reg == [0,0,0,1,1]):e=3 -1
-    if(reg == [1,1,1,0,0]):e=-2.5 +1
-    if(reg == [1,0,1,0,1]):e=-0.01
-    if(reg == [0,1,1,1,0]):e=-0.01
-    if(reg == [0,0,1,1,1]):e=2.5 -1
-    if(reg == [1,1,1,1,0]):e=-0.08
-    if(reg == [0,1,1,1,1]):e=0.2
+    if(reg == [1,0,0,0,0]):e = -3 
+    if(reg == [0,1,0,0,0]):e = -1
+    if(reg == [0,0,1,0,0]):e = 0
+    if(reg == [0,0,0,1,0]):e = 1 -1
+    if(reg == [0,0,0,0,1]):e = 4 -1
+    if(reg == [1,1,0,0,0]):e = -3 +1
+    if(reg == [0,1,1,0,0]):e = -1 +.5
+    if(reg == [0,0,1,1,0]):e = 1 -.5
+    if(reg == [0,0,0,1,1]):e = 3 -1
+    if(reg == [1,1,1,0,0]):e = -2.5 +1
+    if(reg == [1,0,1,0,1]):e = -0.01
+    if(reg == [0,1,1,1,0]):e = -0.01
+    if(reg == [0,0,1,1,1]):e = 2.5 -1
+    if(reg == [1,1,1,1,0]):e = -0.08
+    if(reg == [0,1,1,1,1]):e = 0.2
     return e
 
 def pos3error(reg):
     e = 5
-    if(reg == [1,1,1,1,0]):e=-4 +1
-    if(reg == [0,1,0,0,0]):e=-2 +1
-    if(reg == [1,1,1,1,1]):e=0
-    if(reg == [0,0,0,1,0]):e=2 -1
-    if(reg == [0,0,0,0,1]):e=4 -1
-    if(reg == [1,1,0,0,0]):e=-3 +1
-    if(reg == [0,1,1,0,0]):e=-1 +.5
-    if(reg == [0,0,1,1,0]):e=1 -.5
-    if(reg == [0,0,0,1,1]):e=3 -1
-    if(reg == [1,1,1,0,0]):e=-2.5 +1
-    if(reg == [1,0,1,0,1]):e=-0.01
-    if(reg == [0,1,1,1,0]):e=-0.01
-    if(reg == [0,0,1,1,1]):e=2.5 -1
-    if(reg == [1,1,1,1,0]):e=-0.08
+    if(reg == [1,1,1,1,0]):e = -4 +1
+    if(reg == [0,1,0,0,0]):e = -2 +1
+    if(reg == [1,1,1,1,1]):e = 0
+    if(reg == [0,0,0,1,0]):e = 2 -1
+    if(reg == [0,0,0,0,1]):e = 4 -1
+    if(reg == [1,1,0,0,0]):e = -3 +1
+    if(reg == [0,1,1,0,0]):e = -1 +.5
+    if(reg == [0,0,1,1,0]):e = 1 -.5
+    if(reg == [0,0,0,1,1]):e = 3 -1
+    if(reg == [1,1,1,0,0]):e = -2.5 +1
+    if(reg == [1,0,1,0,1]):e = -0.01
+    if(reg == [0,1,1,1,0]):e = -0.01
+    if(reg == [0,0,1,1,1]):e = 2.5 -1
+    if(reg == [1,1,1,1,0]):e = -0.08
     return e    
 def pos4pid(present,s):
     global sumoferror,kibl,kpbl
@@ -114,14 +117,15 @@ def control_loop():
     velocity_msg.linear.x = 0
     velocity_msg.angular.z = 0
     pub.publish(velocity_msg)
+
     intlist = 0
     distanceList = 0
     state = 0
     pos = 0
-    global sumoferror,sumoferrorbl
+    global sumoferror,sumoferrorbl,stac
     while not rospy.is_shutdown():
         
-        intlist = toint(regions)   
+        intlist = to_int(regions)   
         distanceList = list(regions.values())
         print("Bright :",regions['bright'])
         print("Fright :",regions['fright'])
@@ -149,7 +153,7 @@ def control_loop():
                 if(intlist == [1,1,1,0,0] ):
                     velocity_msg.linear.x = velocity
                     velocity_msg.angular.z = 0
-                    state=0
+                    state = 0
                 else:
                     velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
                     sumoferror = 0
@@ -157,9 +161,7 @@ def control_loop():
                     print("Pos 2 00000",velocity_msg.angular.z)
             elif(distanceList[4]<.5):
                 velocity_msg.angular.z = -turningvelocity
-
-        # else:
-        #     velocity_msg.linear.x = velocity  
+           
 
         if(intlist != [1,1,1,1,1] and pos == 1):
             # This case the rover have to move forward till all the sensor value reach 1
@@ -169,65 +171,60 @@ def control_loop():
                 velocity_msg.linear.x = velocity
                 velocity_msg.angular.z = w
             else:
-                velocity_msg.linear.x =0
+                velocity_msg.linear.x = 0
             state = 0
             
-        if(pos ==3):
+        if(pos == 3):
             if(intlist == [1,1,1,1,1]):
                 velocity_msg.linear.x = velocity 
-                velocity_msg.angular.z = 0 
-                
-
-            else:
-                
-                if(distanceList[4]>.5):
-                    if(intlist == [0,0,1,0,0] or intlist == [1, 1, 1, 1, 0]):
+                velocity_msg.angular.z = 0        
+            else:                
+                if(distanceList[4]>=.5):
+                    if(intlist == [0,0,1,0,0] or intlist == [1,1,1,1,0]):
                         velocity_msg.linear.x = velocity
                         velocity_msg.angular.z = 0
-                        state=0
+                        state = 0
                     else:
                         velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
                         sumoferror = 0
-                        velocity_msg.angular.z = pos4pid(distanceList[3],.7)
+                        velocity_msg.angular.z = pos4pid(distanceList[3],.8)
                         print("Pos 2 00000",velocity_msg.angular.z)
-                elif(distanceList[4]<.6):
+                elif(distanceList[4]<=.6):
                     velocity_msg.angular.z = pidbl(distanceList[4],kpbl,kibl,.5)
+                
         if(pos == 4):
-            if(distanceList[4]>.5):
-                if(intlist == [0,0,1,0,0] or intlist == [1, 1, 1, 0, 0]):
+            if(distanceList[4]>.5):                
+                if(intlist == [0,0,1,0,0] or intlist == [1,1,1,0,0] ):
                     velocity_msg.linear.x = velocity
                     velocity_msg.angular.z = 0
-                    state=0
+
+                    stac = 1
+
                 else:
                     velocity_msg.linear.x = turningvelocity         # At state 2 the rover slows at the end and wait for the turning     
                     sumoferror = 0
                     velocity_msg.angular.z = pos4pid(distanceList[3],.7)
                     print("Pos 2 00000",velocity_msg.angular.z)
+                if(stac == 1 and intlist == [1,1,1,1,0]):
+                    pos += 1
+                    sumoferror = 0
+                    sumoferrorbl = 0    
             elif(distanceList[4]<.6):
-                velocity_msg.angular.z = pidbl(distanceList[4],kpbl,kibl,.5)
+                print("bye")
+                velocity_msg.angular.z = pidbl(distanceList[4],kpbl,kibl,.6)
+            
         if(pos == 5):
             velocity_msg.linear.x = 0
             velocity_msg.angular.z = 0
+            
         print("Pos : ",pos)
+        print("velocity : ",velocity_msg.linear.x )
         pub.publish(velocity_msg)
         print("Controller message pushed at {}".format(rospy.get_time()))
         rate.sleep()
-
-
-
 
 if __name__ == '__main__':
     try:
         control_loop()
     except rospy.ROSInterruptException:
         pass 
-
-
-
-
-
-
-
-
-
-
